@@ -11,9 +11,9 @@ export type T = {
   throws(label: string, fn: () => unknown): void;
 };
 
-export type Suite = { name: string; suite: (t: T) => void };
+export type Suite = { name: string; suite: (t: T) => void | Promise<void> };
 
-export function runSuites(suites: Suite[]): void {
+export async function runSuites(suites: Suite[]): Promise<void> {
   let total = 0;
   let failed = 0;
 
@@ -46,7 +46,7 @@ export function runSuites(suites: Suite[]): void {
         console.log(`  [${threw ? "PASS" : "FAIL"}] ${label} (expected throw)`);
       },
     };
-    suite(t);
+    await suite(t);
   }
 
   console.log("\n══════════════════════════════════════════════════════════");

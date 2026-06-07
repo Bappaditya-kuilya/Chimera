@@ -14,6 +14,7 @@ npm test           # full test suite (42 checks)
 npm run demo       # Phase 0 end-to-end story
 npm run multistage # M2: lifecycle + trust-heal + topology-agnostic divergence
 npm run live       # M3: live telemetry -> runtime, plus a branded SIMULATION
+npm run lan        # M4: two peers discover each other over real UDP multicast
 npm run typecheck  # strict tsc, no emit
 ```
 
@@ -28,7 +29,8 @@ src/
   identity.ts          keypairs, fingerprint = sha256(pubkey), safety numbers, QR pairing manifests
   trust-store.ts       the web of trust — the Sybil boundary
   ingest.ts            sign + verify observations; the authentication edge before the pure fold
-  discovery.ts         DiscoverySource interface + QR/out-of-band impl (+ mDNS/BLE/LoRa stubs)
+  discovery.ts         DiscoverySource interface + QR/out-of-band impl (+ BLE/LoRa stubs)
+  lan.ts               LanDiscovery — REAL zero-config LAN transport over UDP multicast (Node)
   source.ts            ObservationSource interface + Mode (live|demo); Scripted & LiveSignal adapters
   runtime.ts           CausalRuntime: incremental live folding + SIMULATION-branded counterfactuals
   index.ts             public barrel
@@ -36,15 +38,16 @@ test/                  zero-dependency suites (kernel-style PASS/FAIL), run via 
 demo/phase0.ts         narrative: identities -> offline pairing -> Sybil/forgery rejected -> SURVIVED vs COLLAPSED
 demo/multistage.ts     M2: a node's HEALTHY->ALERT->EXPOSED->ISOLATED->SCARRED lifecycle + a 2nd topology
 demo/live.ts           M3: app-layer telemetry -> live runtime; counterfactual as a branded SIMULATION
+demo/lan.ts            M4: two peers discover each other over real UDP multicast; trust still gated
 ```
 
 ## Milestones
 
 - **M1 — kernel + Phase 0** ✅ identity, Sybil resistance, signed-observation ingest, offline QR pairing.
 - **M2 — hardened kernel** ✅ configurable topology/params, trust heal-over-time, node lifecycle.
-- **M3 — live runtime + mode split** ✅ see below.
-- M4 — a real discovery transport (mDNS/LAN) behind the existing interface *(next)*
-- M5 — visualization (Memory River + causal DAG, time-scrubber, actual-vs-counterfactual)
+- **M3 — live runtime + mode split** ✅ ObservationSource, CausalRuntime, SIMULATION branding.
+- **M4 — real LAN transport** ✅ LanDiscovery over UDP multicast; discovery stays distinct from trust.
+- M5 — visualization (Memory River + causal DAG, time-scrubber, actual-vs-counterfactual) *(next)*
 
 ## M3 — live observation source + Live/Demonstration split
 

@@ -9,9 +9,10 @@ import * as kernel from "./kernel.test.js";
 import * as discovery from "./discovery.test.js";
 import * as hardening from "./hardening.test.js";
 import * as runtime from "./runtime.test.js";
+import * as lan from "./lan.test.js";
 
 console.log("══════════════════════════════════════════════════════════");
 console.log(" CHIMERA — test suite (kernel · identity · ingest · discovery · hardening · runtime)");
 console.log("══════════════════════════════════════════════════════════");
 
-runSuites([identity, ingest, kernel, discovery, hardening, runtime]);
+runSuites([identity, ingest, kernel, discovery, hardening, runtime, lan]);

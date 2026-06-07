@@ -15,5 +15,6 @@ export * from "./identity.js";
 export * from "./trust-store.js";
 export * from "./ingest.js";
 export * from "./discovery.js";
+export * from "./lan.js";
 export * from "./source.js";
 export * from "./runtime.js";

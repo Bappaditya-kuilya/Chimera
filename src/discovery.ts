@@ -90,10 +90,12 @@ export class QRDiscovery implements DiscoverySource {
   }
 }
 
-// ──────────────────────── automatic transports (stubbed) ────────────────────────
-// These satisfy the same interface so the engine is transport-agnostic. They throw
-// on start() rather than pretend to work — a stub that silently no-ops would give
-// false confidence, exactly the failure mode the handoff warns about.
+// ──────────────────────── automatic transports ────────────────────────
+// These satisfy the same interface so the engine is transport-agnostic.
+//   - LAN is IMPLEMENTED for real (UDP multicast) in ./lan.ts (Node-only).
+//   - BLE/LoRa are honest stubs: they throw on start() rather than pretend to
+//     work — a stub that silently no-ops would give false confidence, exactly
+//     the failure mode the handoff warns about.
 
 class NotImplementedDiscovery implements DiscoverySource {
   constructor(
@@ -108,16 +110,6 @@ class NotImplementedDiscovery implements DiscoverySource {
     throw new Error(`${this.name} not implemented yet. Plan: ${this.plan}`);
   }
   onPeer(): void {}
-}
-
-/** Zero-config LAN discovery. Internet-independent but LAN-bound; needs a real network to test. */
-export class MdnsDiscovery extends NotImplementedDiscovery {
-  constructor() {
-    super(
-      "mdns",
-      "advertise _chimera._udp.local with fp+port; browse for peers; deliver their PairingManifest. Use a Node mDNS lib or OS API behind this same interface.",
-    );
-  }
 }
 
 /** Phone-to-phone over Bluetooth LE GATT. True off-grid; needs native (Tauri/RN), not browser. */

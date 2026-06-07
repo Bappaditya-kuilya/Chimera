@@ -2,7 +2,7 @@ import { type Suite } from "./harness.js";
 import { seed } from "./harness.js";
 import { type PairingManifest, identityFromSeed, toPairingManifest } from "../src/identity.js";
 import { TrustStore } from "../src/trust-store.js";
-import { MdnsDiscovery, OutOfBandChannel, QRDiscovery } from "../src/discovery.js";
+import { BleDiscovery, OutOfBandChannel, QRDiscovery } from "../src/discovery.js";
 
 export const name = "discovery (QR transport + stubs)";
 
@@ -40,8 +40,8 @@ export const suite: Suite["suite"] = (t) => {
   channel.present("chimera:pair:1:" + base64urlOf(swapped));
   t.eq("integrity-failing manifest dropped", seen.length, 1);
 
-  // automatic transports are honest stubs, not silent no-ops
-  t.throws("mdns stub throws on start", () => new MdnsDiscovery().start());
+  // automatic transports that need native hardware are honest stubs, not silent no-ops
+  t.throws("ble stub throws on start", () => new BleDiscovery().start());
 };
 
 // local helper to craft a raw (possibly bad) pairing payload for the negative test
