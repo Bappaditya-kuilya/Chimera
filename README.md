@@ -15,6 +15,7 @@ npm run demo       # Phase 0 end-to-end story
 npm run multistage # M2: lifecycle + trust-heal + topology-agnostic divergence
 npm run live       # M3: live telemetry -> runtime, plus a branded SIMULATION
 npm run lan        # M4: two peers discover each other over real UDP multicast
+npm run persist    # M7: encrypted Genome Vault round-trip + replay defence
 npm run viz        # interactive sandbox at http://127.0.0.1:5173 (click to attack, toggle defense)
 npm run typecheck  # strict tsc, no emit
 ```
@@ -52,6 +53,24 @@ scripts/viz.mjs        esbuild bundle + dev server for the visualization (no fra
 - **M3 — live runtime + mode split** ✅ ObservationSource, CausalRuntime, SIMULATION branding.
 - **M4 — real LAN transport** ✅ LanDiscovery over UDP multicast; discovery stays distinct from trust.
 - **M5 — visualization** ✅ see below.
+- **M7 — persistence + replay defence** ✅ encrypted Genome Vault; captured-traffic replay rejected.
+
+## M7 — persistence (Genome Vault) + replay defence
+
+Two gaps that separate a demo from something deployable:
+
+- **Replay defence** (`ReplayGuard` in `src/ingest.ts`): a valid signature proves
+  *authorship*, not *freshness*. The guard rejects a captured, validly-signed
+  observation that is **resent** (`replay`) or an **older-tick** observation arriving
+  after a newer one (`stale`) — so an attacker can't rewrite the past with recorded
+  traffic. Backward-compatible: `ingest()` without a guard behaves as before.
+- **Genome Vault** (`src/vault.ts`, Node-only, **zero new deps** via `node:crypto`):
+  encrypted on-disk persistence so a node survives a restart without leaking its
+  identity. The ed25519 **secret key is sealed** with `scrypt(passphrase)` →
+  `AES-256-GCM`; peers (public manifests) and the signed observation log persist
+  alongside it. A wrong passphrase fails on the GCM auth tag (no silent garbage),
+  and the secret never touches disk in clear. `npm run persist` shows a full
+  save → restart → reload round-trip.
 
 ## M5 — visualization (interactive sandbox)
 

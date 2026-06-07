@@ -10,6 +10,7 @@
     "multistage": "tsx demo/multistage.ts",
     "live": "tsx demo/live.ts",
     "lan": "tsx demo/lan.ts",
+    "persist": "tsx demo/persist.ts",
     "viz": "node scripts/viz.mjs --serve",
     "viz:build": "node scripts/viz.mjs",
     "test": "tsx test/all.ts",

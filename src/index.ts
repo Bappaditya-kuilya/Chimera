@@ -18,3 +18,4 @@ export * from "./discovery.js";
 export * from "./lan.js";
 export * from "./source.js";
 export * from "./runtime.js";
+export * from "./vault.js";
