@@ -13,6 +13,7 @@
     "persist": "tsx demo/persist.ts",
     "analyze": "tsx demo/analyze-log.ts",
     "host": "tsx demo/host.ts",
+    "serve": "node scripts/viz.mjs && tsx demo/serve.ts",
     "viz": "node scripts/viz.mjs --serve",
     "viz:build": "node scripts/viz.mjs",
     "test": "tsx test/all.ts",

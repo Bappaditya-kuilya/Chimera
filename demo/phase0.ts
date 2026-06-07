@@ -12,6 +12,7 @@
 
 import { type Observation, counterfactual, makeId, run, verdict } from "../src/kernel.js";
 import { encodePairing, identityFromSeed, safetyNumber, toPairingManifest } from "../src/identity.js";
+import { qrTerminal } from "../src/qr.js";
 import { TrustStore } from "../src/trust-store.js";
 import { ingest, signObservation } from "../src/ingest.js";
 import { OutOfBandChannel, QRDiscovery } from "../src/discovery.js";
@@ -61,6 +62,8 @@ console.log(`    trusted peers: ${trust.list().map((p) => p.nick).join(", ")}  (
 
 console.log("\n    a pairing QR payload looks like (camera-scannable / paste-able):");
 console.log(`    ${encodePairing(toPairingManifest(alpha, issuedAt)).slice(0, 72)} …`);
+console.log("\n    …rendered as an actual scannable QR code:");
+console.log(await qrTerminal(encodePairing(toPairingManifest(alpha, issuedAt))));
 
 // ── 3 & 4. signed attack reports, with adversarial noise ──────────
 // The proof scenario's two floods on Bravo — now each is SIGNED by its reporter.

@@ -32,6 +32,7 @@ anyone trying to understand cause and effect in a system under attack.
 npm run analyze   # parse a real nginx/Apache access log -> causal verdict
 npm run analyze /var/log/nginx/access.log    # ...or point it at your own
 npm run host      # read THIS machine's real network throughput into the engine
+npm run serve     # run Chimera as a live HTTP+WebSocket service (UI + API) on :8787
 ```
 
 `npm run analyze` reads the standard "combined" access-log format, derives the
@@ -87,6 +88,25 @@ scripts/viz.mjs        esbuild bundle + dev server for the visualization (no fra
 - **M5 — visualization** ✅ see below.
 - **M7 — persistence + replay defence** ✅ encrypted Genome Vault; captured-traffic replay rejected.
 - **M9 — real data integration** ✅ analyze real access logs; ingest real host metrics.
+- **M10 — live service + real QR** ✅ HTTP+WebSocket API serving the UI; scannable pairing QR.
+
+## M10 — run it as a real service (+ real QR)
+
+- **Live service** (`src/server.ts`, `npm run serve` → http://127.0.0.1:8787): an
+  HTTP + WebSocket ([`ws`](https://www.npmjs.com/package/ws)) server wrapping a live
+  `CausalRuntime`, also serving the interactive UI. Other systems integrate over REST:
+  ```
+  GET  /api/state      -> { verdict, mode, nodes:[{node,state,trust,...}] }
+  GET  /api/timeline   -> the event timeline
+  POST /api/observe    -> ingest one Observation; returns { verdict, produced }
+  POST /api/simulate   -> { do/remove } -> a branded SIMULATION result
+  WS   /               -> streams { verdict, produced, obs } on every ingest
+  ```
+  This is the "run Chimera on your real events" surface — POST observations, get a
+  live explainable verdict, stream decisions to any client.
+- **Real QR** (`src/qr.ts`, via [`qrcode`](https://www.npmjs.com/package/qrcode)):
+  pairing manifests render as actual camera-scannable QR codes (`npm run demo` now
+  prints one in the terminal), plus `qrDataUrl()` for embedding in a web UI.
 
 ## M9 — real data integration (no more synthetic-only)
 

@@ -98,6 +98,14 @@ export class CausalRuntime {
   get verdict(): Verdict {
     return verdict(this.state);
   }
+  /** The live world-state (a snapshot copy is not made — treat as read-only). */
+  liveState(): State {
+    return this.state;
+  }
+  /** The nodes of this runtime's topology. */
+  nodes(): string[] {
+    return this.config.topology.nodes;
+  }
   snapshot(): RuntimeSnapshot {
     return {
       brand: "ACTUAL",
