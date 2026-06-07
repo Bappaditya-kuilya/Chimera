@@ -11,6 +11,11 @@
  * Phase 0 note: identity/signature verification happens OUTSIDE this file, at the
  * ingest boundary (see ../src/ingest.ts). By the time observations reach run(),
  * they are already authenticated. This keeps the fold pure and replayable.
+ *
+ * M2 (hardening): topology + tuning are now a Config threaded through the fold
+ * (default = STAR + DEFAULT_PARAMS, so the original proof is byte-identical).
+ * Added: Heartbeat/TrustRegen (trust heals over quiet logical time) and the
+ * HEALTHY/ALERT/EXPOSED/ISOLATED/SCARRED node lifecycle (a pure projection).
  */
 
 // ───────────────────────────── Types ─────────────────────────────
@@ -24,11 +29,13 @@ export type Observation =
   | { id: EventId; t: Tick; kind: "PacketFlood"; node: NodeId; rate: number }
   | { id: EventId; t: Tick; kind: "HeartbeatLost"; node: NodeId }
   | { id: EventId; t: Tick; kind: "SignatureInvalid"; node: NodeId }
-  | { id: EventId; t: Tick; kind: "RouteFailure"; from: NodeId; to: NodeId };
+  | { id: EventId; t: Tick; kind: "RouteFailure"; from: NodeId; to: NodeId }
+  | { id: EventId; t: Tick; kind: "Heartbeat"; node: NodeId }; // a quiet tick: "node behaved"
 
 // ENDOGENOUS — consequences. NEVER authored by hand. Always produced by decide().
 export type Decision =
   | { id: EventId; t: Tick; kind: "TrustDrop"; node: NodeId; causedBy: EventId[] }
+  | { id: EventId; t: Tick; kind: "TrustRegen"; node: NodeId; causedBy: EventId[] }
   | { id: EventId; t: Tick; kind: "Quarantine"; node: NodeId; causedBy: EventId[] }
   | { id: EventId; t: Tick; kind: "Reroute"; from: NodeId; to: NodeId; causedBy: EventId[] }
   | { id: EventId; t: Tick; kind: "Spread"; from: NodeId; to: NodeId; causedBy: EventId[] }
@@ -58,22 +65,41 @@ export type Intervention = {
 
 export type Verdict = "SURVIVED" | "COLLAPSED";
 
-// ──────────────────────────── Topology ───────────────────────────
-// Star mesh centred on Bravo (the hub). Attack Bravo and the whole net is at risk.
+// ──────────────────────────── Config ─────────────────────────────
+// Topology and tuning are data, not hardcoded — so the SAME engine runs a star
+// mesh, a line, a k8s cluster, whatever. Defaults reproduce the original proof.
 
-export const NODES: NodeId[] = ["Alpha", "Bravo", "Charlie", "Delta"];
-export const EDGES: Record<NodeId, NodeId[]> = {
-  Alpha: ["Bravo"],
-  Bravo: ["Alpha", "Charlie", "Delta"],
-  Charlie: ["Bravo"],
-  Delta: ["Bravo"],
+export type Topology = { nodes: NodeId[]; edges: Record<NodeId, NodeId[]> };
+export type Params = {
+  trustDrop: number; // each attack signal costs this much trust
+  compromised: number; // trust below this = compromised
+  collapseAt: number; // this many live-infected nodes = network collapse
+  regen: number; // trust healed per quiet Heartbeat (decay-over-time, reversed)
+};
+export type Config = { topology: Topology; params: Params };
+
+// Star mesh centred on Bravo (the hub). Attack Bravo and the whole net is at risk.
+export const STAR: Topology = {
+  nodes: ["Alpha", "Bravo", "Charlie", "Delta"],
+  edges: {
+    Alpha: ["Bravo"],
+    Bravo: ["Alpha", "Charlie", "Delta"],
+    Charlie: ["Bravo"],
+    Delta: ["Bravo"],
+  },
 };
 
-export const TRUST_DROP = 0.3; // each attack signal costs this much trust
-export const COMPROMISED = 0.5; // trust below this = compromised
-export const COLLAPSE_AT = 3; // this many live-infected nodes = network collapse
+export const DEFAULT_PARAMS: Params = { trustDrop: 0.3, compromised: 0.5, collapseAt: 3, regen: 0.1 };
+export const DEFAULT_CONFIG: Config = { topology: STAR, params: DEFAULT_PARAMS };
 
-const neighbors = (n: NodeId): NodeId[] => [...(EDGES[n] ?? [])].sort();
+// Back-compat aliases (older imports). Same values the proof was built on.
+export const NODES = STAR.nodes;
+export const EDGES = STAR.edges;
+export const TRUST_DROP = DEFAULT_PARAMS.trustDrop;
+export const COMPROMISED = DEFAULT_PARAMS.compromised;
+export const COLLAPSE_AT = DEFAULT_PARAMS.collapseAt;
+
+const neighbors = (topo: Topology, n: NodeId): NodeId[] => [...(topo.edges[n] ?? [])].sort();
 
 // ──────────────────────────── Helpers ────────────────────────────
 
@@ -82,10 +108,10 @@ export function makeId(kind: string, label: string, t: Tick): EventId {
   return label ? `${kind}:${label}@t${t}` : `${kind}@t${t}`;
 }
 
-export function genesis(): State {
+export function genesis(topo: Topology = STAR): State {
   const trust: Record<NodeId, number> = {};
   const trustLog: Record<NodeId, EventId[]> = {};
-  for (const n of NODES) {
+  for (const n of topo.nodes) {
     trust[n] = 1.0;
     trustLog[n] = [];
   }
@@ -114,10 +140,13 @@ export function clone(s: State): State {
   };
 }
 
-// ──────────────────── apply: the single fold step ────────────────────
-// Pure: (state, event) -> next state. Used by BOTH run() and reconstruct().
+// trust never escapes [0, 1]; rounded to kill float drift so replay is exact.
+const clampTrust = (x: number): number => Math.round(Math.max(0, Math.min(1, x)) * 1e6) / 1e6;
 
-export function apply(state: State, e: Event): State {
+// ──────────────────── apply: the single fold step ────────────────────
+// Pure: (state, event, params) -> next state. Used by BOTH run() and reconstruct().
+
+export function apply(state: State, e: Event, params: Params = DEFAULT_PARAMS): State {
   const s = clone(state);
   switch (e.kind) {
     case "PacketFlood":
@@ -126,10 +155,14 @@ export function apply(state: State, e: Event): State {
     case "HeartbeatLost":
     case "SignatureInvalid":
     case "RouteFailure":
+    case "Heartbeat":
       break; // raw signals; trust only ever moves through decisions
     case "TrustDrop":
-      s.trust[e.node] = Math.max(0, (s.trust[e.node] ?? 1) - TRUST_DROP);
+      s.trust[e.node] = clampTrust((s.trust[e.node] ?? 1) - params.trustDrop);
       s.trustLog[e.node] = [...(s.trustLog[e.node] ?? []), e.id];
+      break;
+    case "TrustRegen":
+      s.trust[e.node] = clampTrust((s.trust[e.node] ?? 1) + params.regen);
       break;
     case "Quarantine":
       s.quarantined.add(e.node);
@@ -165,7 +198,9 @@ export function decide(
   obs: Observation | null,
   iv: Intervention | undefined,
   tick: Tick,
+  config: Config = DEFAULT_CONFIG,
 ): Decision[] {
+  const { topology: topo, params } = config;
   if (obs) {
     switch (obs.kind) {
       case "PacketFlood":
@@ -178,9 +213,9 @@ export function decide(
 
         // Quarantine is OBSERVATION-driven: you isolate a node because you DETECTED
         // an attack on it. Silent spread (no fresh observation) is never reacted to.
-        const newTrust = Math.max(0, (state.trust[node] ?? 1) - TRUST_DROP);
+        const newTrust = clampTrust((state.trust[node] ?? 1) - params.trustDrop);
         const forced = iv?.do?.[`Quarantine:${node}`];
-        const wouldQuarantine = newTrust < COMPROMISED || forced === true;
+        const wouldQuarantine = newTrust < params.compromised || forced === true;
         if (forced !== false && wouldQuarantine && !state.quarantined.has(node)) {
           out.push({
             id: makeId("Quarantine", node, tick),
@@ -191,6 +226,18 @@ export function decide(
           });
         }
         return out;
+      }
+      case "Heartbeat": {
+        // Trust heals over quiet logical time: a node that is behaving (not
+        // currently infected) regenerates trust toward baseline. This is the
+        // "trust decay over time" axis — reversed, because recovery is the goal.
+        const node = obs.node;
+        if (!state.infected.has(node) && (state.trust[node] ?? 1) < 1) {
+          return [
+            { id: makeId("TrustRegen", node, tick), t: tick, kind: "TrustRegen", node, causedBy: [obs.id] },
+          ];
+        }
+        return [];
       }
       case "RouteFailure":
         return [
@@ -209,9 +256,9 @@ export function decide(
   // ── state-driven cascade (one decision per call) ──
 
   // 1. Spread: a compromised, un-quarantined node infects an uninfected neighbour.
-  for (const from of NODES) {
-    if (state.infected.has(from) && (state.trust[from] ?? 1) < COMPROMISED && !state.quarantined.has(from)) {
-      for (const to of neighbors(from)) {
+  for (const from of topo.nodes) {
+    if (state.infected.has(from) && (state.trust[from] ?? 1) < params.compromised && !state.quarantined.has(from)) {
+      for (const to of neighbors(topo, from)) {
         if (!state.infected.has(to)) {
           return [
             {
@@ -229,17 +276,17 @@ export function decide(
   }
 
   // 2. Collapse: too many live-infected nodes and the organism dies.
-  const live = NODES.filter((n) => state.infected.has(n) && !state.quarantined.has(n));
-  if (state.alive && live.length >= COLLAPSE_AT) {
+  const live = topo.nodes.filter((n) => state.infected.has(n) && !state.quarantined.has(n));
+  if (state.alive && live.length >= params.collapseAt) {
     return [{ id: makeId("Collapse", "", tick), t: tick, kind: "Collapse", causedBy: [...state.spreads] }];
   }
 
   // 3. Recovery: once nothing live is still compromised, quarantined nodes heal.
-  const stillCompromised = NODES.some(
-    (n) => !state.quarantined.has(n) && state.infected.has(n) && (state.trust[n] ?? 1) < COMPROMISED,
+  const stillCompromised = topo.nodes.some(
+    (n) => !state.quarantined.has(n) && state.infected.has(n) && (state.trust[n] ?? 1) < params.compromised,
   );
   if (!stillCompromised) {
-    for (const n of NODES) {
+    for (const n of topo.nodes) {
       if (state.quarantined.has(n) && state.infected.has(n) && !state.recovered.has(n)) {
         return [
           {
@@ -261,29 +308,33 @@ export function decide(
 // Folds observations in (tick, id) order, interleaving derived decisions and
 // running the cascade to a fixpoint after each. Honours the intervention.
 
-export function run(observations: Observation[], iv?: Intervention): { timeline: Timeline; state: State } {
+export function run(
+  observations: Observation[],
+  iv?: Intervention,
+  config: Config = DEFAULT_CONFIG,
+): { timeline: Timeline; state: State } {
   const removed = new Set(iv?.remove ?? []);
   const inbox = observations
     .filter((o) => !removed.has(o.id))
     .slice()
     .sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
 
-  let state = genesis();
+  let state = genesis(config.topology);
   const timeline: Timeline = [];
 
   for (const o of inbox) {
     timeline.push(o);
-    state = apply(state, o);
-    for (const d of decide(state, o, iv, o.t)) {
+    state = apply(state, o, config.params);
+    for (const d of decide(state, o, iv, o.t, config)) {
       timeline.push(d);
-      state = apply(state, d);
+      state = apply(state, d, config.params);
     }
     // drive the cascade to a fixpoint (terminates: state changes are monotonic)
     for (let guard = 0; guard < 1000; guard++) {
-      const [d] = decide(state, null, iv, o.t);
+      const [d] = decide(state, null, iv, o.t, config);
       if (!d) break;
       timeline.push(d);
-      state = apply(state, d);
+      state = apply(state, d, config.params);
     }
   }
 
@@ -293,9 +344,9 @@ export function run(observations: Observation[], iv?: Intervention): { timeline:
 // ──────────────────── derived queries ────────────────────
 
 // State as-of a tick: replay the recorded timeline up to t. Powers Memory River.
-export function reconstruct(timeline: Timeline, t: Tick): State {
+export function reconstruct(timeline: Timeline, t: Tick, params: Params = DEFAULT_PARAMS): State {
   let state = genesis();
-  for (const e of timeline) if (e.t <= t) state = apply(state, e);
+  for (const e of timeline) if (e.t <= t) state = apply(state, e, params);
   return state;
 }
 
@@ -303,12 +354,13 @@ export function reconstruct(timeline: Timeline, t: Tick): State {
 export function counterfactual(
   observations: Observation[],
   iv: Intervention,
+  config: Config = DEFAULT_CONFIG,
 ): { timeline: Timeline; state: State } {
-  return run(observations, iv);
+  return run(observations, iv, config);
 }
 
 // Walk causedBy parents transitively -> the observations that justify a decision.
-const OBS_KINDS = new Set(["PacketFlood", "HeartbeatLost", "SignatureInvalid", "RouteFailure"]);
+const OBS_KINDS = new Set(["PacketFlood", "HeartbeatLost", "SignatureInvalid", "RouteFailure", "Heartbeat"]);
 export function explain(timeline: Timeline, decisionId: EventId): Observation[] {
   const byId = new Map(timeline.map((e) => [e.id, e]));
   const seen = new Set<EventId>();
@@ -336,4 +388,39 @@ export function diff(a: Timeline, b: Timeline): { divergedAt: Tick; onlyInA: Eve
 
 export function verdict(state: State): Verdict {
   return state.alive ? "SURVIVED" : "COLLAPSED";
+}
+
+// ──────────────────── node lifecycle (M2) ────────────────────
+// A PURE projection over State — not stored, derived. Five states:
+//   HEALTHY  : trust intact, not under attack
+//   ALERT    : trust dented (an attack signal landed) but not infected
+//   EXPOSED  : actively infected / under live attack, not yet isolated
+//   ISOLATED : quarantined, not yet healed
+//   SCARRED  : was isolated, has recovered — healthy again, but it happened
+
+export type NodeState = "HEALTHY" | "ALERT" | "EXPOSED" | "ISOLATED" | "SCARRED";
+
+export function nodeState(state: State, node: NodeId, params: Params = DEFAULT_PARAMS): NodeState {
+  if (state.quarantined.has(node)) return state.recovered.has(node) ? "SCARRED" : "ISOLATED";
+  if (state.infected.has(node)) return "EXPOSED";
+  const trust = state.trust[node] ?? 1;
+  void params; // thresholds reserved for future graded ALERT levels
+  return trust < 1 ? "ALERT" : "HEALTHY";
+}
+
+/** The lifecycle trace for a node: every tick at which its state changed. */
+export function lifecycle(
+  timeline: Timeline,
+  node: NodeId,
+  params: Params = DEFAULT_PARAMS,
+): Array<{ t: Tick; state: NodeState }> {
+  const ticks = [...new Set(timeline.map((e) => e.t))].sort((a, b) => a - b);
+  const out: Array<{ t: Tick; state: NodeState }> = [];
+  let prev: NodeState | null = null;
+  for (const t of ticks) {
+    const st = nodeState(reconstruct(timeline, t, params), node, params);
+    if (st !== prev) out.push({ t, state: st });
+    prev = st;
+  }
+  return out;
 }

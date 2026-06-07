@@ -30,8 +30,12 @@ function fmt(e: Event): string {
       return `BADSIG      ${e.node}`;
     case "RouteFailure":
       return `ROUTEFAIL   ${e.from}->${e.to}`;
+    case "Heartbeat":
+      return `heartbeat   ${e.node}`;
     case "TrustDrop":
       return `  trust--   ${e.node}`;
+    case "TrustRegen":
+      return `  trust++   ${e.node}`;
     case "Quarantine":
       return `  QUARANTINE ${e.node}`;
     case "Reroute":
