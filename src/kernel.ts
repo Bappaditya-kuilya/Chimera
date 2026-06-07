@@ -304,6 +304,34 @@ export function decide(
   return [];
 }
 
+// ──────────────────── fold: one observation -> its consequences ────────────────────
+// The atomic step shared by the batch engine (run) and the incremental runtime
+// (CausalRuntime). Pure: applies the observation, the observation-driven
+// decisions, then drives the state cascade to a fixpoint. Returns the new state
+// and the decisions PRODUCED (the caller owns where the observation goes in the log).
+
+export function fold(
+  state: State,
+  o: Observation,
+  iv: Intervention | undefined,
+  config: Config = DEFAULT_CONFIG,
+): { state: State; produced: Decision[] } {
+  const produced: Decision[] = [];
+  let s = apply(state, o, config.params);
+  for (const d of decide(s, o, iv, o.t, config)) {
+    produced.push(d);
+    s = apply(s, d, config.params);
+  }
+  // drive the cascade to a fixpoint (terminates: state changes are monotonic)
+  for (let guard = 0; guard < 1000; guard++) {
+    const [d] = decide(s, null, iv, o.t, config);
+    if (!d) break;
+    produced.push(d);
+    s = apply(s, d, config.params);
+  }
+  return { state: s, produced };
+}
+
 // ──────────────────── run: THE engine ────────────────────
 // Folds observations in (tick, id) order, interleaving derived decisions and
 // running the cascade to a fixpoint after each. Honours the intervention.
@@ -324,18 +352,9 @@ export function run(
 
   for (const o of inbox) {
     timeline.push(o);
-    state = apply(state, o, config.params);
-    for (const d of decide(state, o, iv, o.t, config)) {
-      timeline.push(d);
-      state = apply(state, d, config.params);
-    }
-    // drive the cascade to a fixpoint (terminates: state changes are monotonic)
-    for (let guard = 0; guard < 1000; guard++) {
-      const [d] = decide(state, null, iv, o.t, config);
-      if (!d) break;
-      timeline.push(d);
-      state = apply(state, d, config.params);
-    }
+    const r = fold(state, o, iv, config);
+    state = r.state;
+    timeline.push(...r.produced);
   }
 
   return { timeline, state };

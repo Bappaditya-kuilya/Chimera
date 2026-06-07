@@ -13,6 +13,7 @@ npm start          # the kernel proof  (observations.ts)
 npm test           # full test suite (42 checks)
 npm run demo       # Phase 0 end-to-end story
 npm run multistage # M2: lifecycle + trust-heal + topology-agnostic divergence
+npm run live       # M3: live telemetry -> runtime, plus a branded SIMULATION
 npm run typecheck  # strict tsc, no emit
 ```
 
@@ -21,26 +22,51 @@ npm run typecheck  # strict tsc, no emit
 ```
 observations.ts        canonical kernel proof (unchanged behaviour, now imports src/kernel)
 src/
-  kernel.ts            the proven PURE causal engine: run / counterfactual / explain / diff / reconstruct
+  kernel.ts            the proven PURE causal engine: fold / run / counterfactual / explain / reconstruct
                        + M2: configurable Topology/Params, trust heal-over-time, node lifecycle
   crypto.ts            ed25519 + sha256/512 + canonical JSON — the ONLY crypto-lib touchpoint
   identity.ts          keypairs, fingerprint = sha256(pubkey), safety numbers, QR pairing manifests
   trust-store.ts       the web of trust — the Sybil boundary
   ingest.ts            sign + verify observations; the authentication edge before the pure fold
   discovery.ts         DiscoverySource interface + QR/out-of-band impl (+ mDNS/BLE/LoRa stubs)
+  source.ts            ObservationSource interface + Mode (live|demo); Scripted & LiveSignal adapters
+  runtime.ts           CausalRuntime: incremental live folding + SIMULATION-branded counterfactuals
   index.ts             public barrel
 test/                  zero-dependency suites (kernel-style PASS/FAIL), run via npm test
 demo/phase0.ts         narrative: identities -> offline pairing -> Sybil/forgery rejected -> SURVIVED vs COLLAPSED
 demo/multistage.ts     M2: a node's HEALTHY->ALERT->EXPOSED->ISOLATED->SCARRED lifecycle + a 2nd topology
+demo/live.ts           M3: app-layer telemetry -> live runtime; counterfactual as a branded SIMULATION
 ```
 
 ## Milestones
 
 - **M1 — kernel + Phase 0** ✅ identity, Sybil resistance, signed-observation ingest, offline QR pairing.
-- **M2 — hardened kernel** ✅ see below.
-- M3 — live observation source + Live/Demonstration mode split *(next)*
-- M4 — a real discovery transport (mDNS/LAN) behind the existing interface
+- **M2 — hardened kernel** ✅ configurable topology/params, trust heal-over-time, node lifecycle.
+- **M3 — live runtime + mode split** ✅ see below.
+- M4 — a real discovery transport (mDNS/LAN) behind the existing interface *(next)*
 - M5 — visualization (Memory River + causal DAG, time-scrubber, actual-vs-counterfactual)
+
+## M3 — live observation source + Live/Demonstration split
+
+The "Causal Security Runtime" pivot, realized: the kernel doesn't care where
+observations come from, so a single `ObservationSource` interface puts any source
+in front of it.
+
+- **`ObservationSource` + `Mode`** — every source declares `live` or `demo`.
+  - `ScriptedSource` (demo): replays a canned scenario — the attack is *authored*.
+  - `LiveSignalSource` (live): maps real **app-layer telemetry** (message rate, bad
+    signatures, malformed payloads, route flaps, quiet intervals) into observations.
+    (Per the handoff: a browser/Node process can't see raw packets, so the live path
+    uses app-layer signals.)
+- **`CausalRuntime`** — folds observations incrementally via the same pure `fold()`
+  the batch engine uses (proven equivalent in tests), keeping authoritative
+  timeline + state and a replayable observation log.
+- **The mode split (safety property):** `simulate(iv)` — the do()-operator — always
+  returns a result **branded `SIMULATION`** and **never mutates live state**. A
+  scripted attack or counterfactual can never be mistaken for real defense, which is
+  what would otherwise give dangerous false confidence.
+
+
 
 ## M2 — hardening
 

@@ -8,6 +8,7 @@
     "start": "tsx observations.ts",
     "demo": "tsx demo/phase0.ts",
     "multistage": "tsx demo/multistage.ts",
+    "live": "tsx demo/live.ts",
     "test": "tsx test/all.ts",
     "typecheck": "tsc --noEmit"
   },
