@@ -15,6 +15,7 @@ npm run demo       # Phase 0 end-to-end story
 npm run multistage # M2: lifecycle + trust-heal + topology-agnostic divergence
 npm run live       # M3: live telemetry -> runtime, plus a branded SIMULATION
 npm run lan        # M4: two peers discover each other over real UDP multicast
+npm run viz        # M5: visualization at http://127.0.0.1:5173 (esbuild bundle + serve)
 npm run typecheck  # strict tsc, no emit
 ```
 
@@ -39,6 +40,9 @@ demo/phase0.ts         narrative: identities -> offline pairing -> Sybil/forgery
 demo/multistage.ts     M2: a node's HEALTHY->ALERT->EXPOSED->ISOLATED->SCARRED lifecycle + a 2nd topology
 demo/live.ts           M3: app-layer telemetry -> live runtime; counterfactual as a branded SIMULATION
 demo/lan.ts            M4: two peers discover each other over real UDP multicast; trust still gated
+web/index.html         M5: the visualization shell (vanilla, dark theme)
+web/app.ts             M5: reads straight off the kernel — mesh + time-scrubber + actual/cf split
+scripts/viz.mjs        esbuild bundle + dev server for the visualization (no framework)
 ```
 
 ## Milestones
@@ -47,7 +51,26 @@ demo/lan.ts            M4: two peers discover each other over real UDP multicast
 - **M2 — hardened kernel** ✅ configurable topology/params, trust heal-over-time, node lifecycle.
 - **M3 — live runtime + mode split** ✅ ObservationSource, CausalRuntime, SIMULATION branding.
 - **M4 — real LAN transport** ✅ LanDiscovery over UDP multicast; discovery stays distinct from trust.
-- M5 — visualization (Memory River + causal DAG, time-scrubber, actual-vs-counterfactual) *(next)*
+- **M5 — visualization** ✅ see below.
+
+## M5 — visualization (the Memory River)
+
+`npm run viz` → http://127.0.0.1:5173. A single self-contained page (vanilla TS +
+SVG, **no UI framework**) that reads **straight off the kernel**:
+
+- `run()` and `counterfactual()` produce the two timelines; they render **side by
+  side** — ACTUAL vs `do(Quarantine:Bravo = false)`.
+- A **time-scrubber** drives `reconstruct(t)` (the "Memory River"): nodes recolour
+  by `nodeState()` and trust as you scrub, and each panel shows its verdict and the
+  events up to that tick.
+- It calls out the **divergence tick** — the same inputs, opposite fate.
+
+The browser bundle is produced by `scripts/viz.mjs` (esbuild, already present via
+tsx — pinned as a devDependency). It imports only browser-safe modules (the pure
+kernel); `lan.ts`/`node:dgram` are never pulled in. `web/app.js` is a build
+artifact and is gitignored.
+
+
 
 ## M3 — live observation source + Live/Demonstration split
 
