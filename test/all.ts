@@ -12,9 +12,10 @@ import * as runtime from "./runtime.test.js";
 import * as lan from "./lan.test.js";
 import * as replay from "./replay.test.js";
 import * as vault from "./vault.test.js";
+import * as properties from "./properties.test.js";
 
 console.log("══════════════════════════════════════════════════════════");
 console.log(" CHIMERA — full test suite");
 console.log("══════════════════════════════════════════════════════════");
 
-runSuites([identity, ingest, kernel, discovery, hardening, runtime, lan, replay, vault]);
+runSuites([identity, ingest, kernel, discovery, hardening, runtime, lan, replay, vault, properties]);

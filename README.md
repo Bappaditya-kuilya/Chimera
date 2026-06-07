@@ -7,16 +7,33 @@ can: *"Can you prove that your intervention mattered?"*
 
 See `PROJECT_CHIMERA_HANDOFF.md` for the full thesis and design rationale.
 
+## Try it in 30 seconds (no security knowledge needed)
+
 ```bash
-npm install        # local node_modules only — nothing global
-npm start          # the kernel proof  (observations.ts)
-npm test           # full test suite (42 checks)
-npm run demo       # Phase 0 end-to-end story
+npm install
+npm run viz       # opens an interactive sandbox at http://127.0.0.1:5173
+```
+
+Then, in the browser:
+1. Press **⚡ Launch demo attack** (or click the center node twice). Watch the network get hit.
+2. See the verdict: **✅ SURVIVED** — the auto-defense quarantined the attacked node.
+3. Read the line that says *"with defense → SURVIVED, without it → COLLAPSED."*
+   **That is the whole point:** Chimera replays the identical attack with the defense
+   switched off and proves your defense is what saved the network.
+4. Flip **Auto-defense OFF** and re-launch to watch it collapse. Click any event to see *why* it happened.
+
+**Who is this for?** Anyone who needs to answer *"did our defensive action actually
+matter, or were we fine anyway?"* — a security/ops engineer reviewing an incident, or
+anyone trying to understand cause and effect in a system under attack.
+
+```bash
+npm test           # full test suite (84 checks, incl. 400 fuzzed scenarios)
+npm start          # the original kernel proof  (observations.ts)
+npm run demo       # Phase 0: identity, Sybil resistance, offline pairing
 npm run multistage # M2: lifecycle + trust-heal + topology-agnostic divergence
 npm run live       # M3: live telemetry -> runtime, plus a branded SIMULATION
 npm run lan        # M4: two peers discover each other over real UDP multicast
 npm run persist    # M7: encrypted Genome Vault round-trip + replay defence
-npm run viz        # interactive sandbox at http://127.0.0.1:5173 (click to attack, toggle defense)
 npm run typecheck  # strict tsc, no emit
 ```
 
@@ -161,7 +178,31 @@ signed observations ──► [ ingest: verify vs web of trust ] ──► Obser
 ### Discovery transports
 
 `DiscoverySource` is one interface; the channel is assumed **hostile** — it only
-delivers *candidate* manifests, never trust. Implemented now: **QR / out-of-band**.
-Stubbed behind the same interface (throw on `start()`, never silent no-ops):
-`MdnsDiscovery` (LAN), `BleDiscovery` (phone-to-phone, needs native), `LoRaDiscovery`
-(long-range radio).
+delivers *candidate* manifests, never trust. Implemented: **QR / out-of-band**
+(browser-safe) and **LAN over UDP multicast** (`LanDiscovery`, Node). Stubbed behind
+the same interface (throw on `start()`, never silent no-ops): `BleDiscovery`
+(phone-to-phone, needs native), `LoRaDiscovery` (long-range radio).
+
+## Security model & honest limitations
+
+What Chimera **does** defend (and tests prove): authorship via ed25519 signatures,
+Sybil resistance (an unvouched key authors nothing), forgery/tamper rejection,
+replay & stale-message rejection, and identity-at-rest (encrypted Genome Vault).
+
+What it is **not** (yet) — stated plainly so nobody is misled:
+
+- **It is a runtime/engine, not a turnkey product.** The "live" observation source
+  maps *app-layer* telemetry (message rate, bad signatures, route flaps); it does not
+  read raw packets, and there are no production integrations (k8s/firewall/IDS) wired
+  up — those are adapters you'd write against `ObservationSource`.
+- **The threat model is the mesh/identity layer, not a hardened deployment.** No
+  network transport encryption beyond signatures, no formal audit, no rate-limiting/DoS
+  protection, no key rotation/revocation workflow beyond `TrustStore.remove`.
+- **The attack/defense policy is illustrative.** The trust/quarantine/spread rules are
+  a clear, deterministic model — not a validated detection ruleset for real adversaries.
+- **Persistence is local-file.** Single-node vault; no distributed/replicated store.
+
+The value proposition — *deterministic, explainable, counterfactual proof that an
+intervention mattered* — is real and tested. Treat the rest as a well-built foundation
+to extend, not a finished security appliance.
+
