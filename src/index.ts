@@ -19,3 +19,5 @@ export * from "./lan.js";
 export * from "./source.js";
 export * from "./runtime.js";
 export * from "./vault.js";
+export * from "./sources/access-log.js";
+export * from "./sources/host-metrics.js";

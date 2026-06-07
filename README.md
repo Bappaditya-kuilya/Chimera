@@ -26,6 +26,21 @@ Then, in the browser:
 matter, or were we fine anyway?"* — a security/ops engineer reviewing an incident, or
 anyone trying to understand cause and effect in a system under attack.
 
+## Run it on REAL data
+
+```bash
+npm run analyze   # parse a real nginx/Apache access log -> causal verdict
+npm run analyze /var/log/nginx/access.log    # ...or point it at your own
+npm run host      # read THIS machine's real network throughput into the engine
+```
+
+`npm run analyze` reads the standard "combined" access-log format, derives the
+topology and the attack from the log itself, and answers *"did blocking that client
+actually save the server?"* — on the bundled sample it proves **blocking the flooding
+IP is what prevented a COLLAPSE**. `npm run host` uses
+[`systeminformation`](https://www.npmjs.com/package/systeminformation) to feed your
+machine's actual network stats into the runtime.
+
 ```bash
 npm test           # full test suite (84 checks, incl. 400 fuzzed scenarios)
 npm start          # the original kernel proof  (observations.ts)
@@ -71,6 +86,25 @@ scripts/viz.mjs        esbuild bundle + dev server for the visualization (no fra
 - **M4 — real LAN transport** ✅ LanDiscovery over UDP multicast; discovery stays distinct from trust.
 - **M5 — visualization** ✅ see below.
 - **M7 — persistence + replay defence** ✅ encrypted Genome Vault; captured-traffic replay rejected.
+- **M9 — real data integration** ✅ analyze real access logs; ingest real host metrics.
+
+## M9 — real data integration (no more synthetic-only)
+
+Chimera now runs on **real signals**, via real libraries, not just scripted demos:
+
+- **`parseAccessLog`** (`src/sources/access-log.ts`): parses the standard nginx/Apache
+  **combined log format** (real regex + Apache-date parsing), buckets requests per
+  client IP per second, maps rate bursts → `PacketFlood` and auth-failure bursts →
+  `SignatureInvalid`, and **derives the topology from the IPs actually in the log**
+  (a Server hub with each client as a leaf). `npm run analyze [file]` then runs the
+  causal verdict + counterfactual on it. On the bundled sample, it proves that
+  blocking the flooding IP is what prevented a network collapse.
+- **`HostMetricsSource`** (`src/sources/host-metrics.ts`): uses
+  [`systeminformation`](https://www.npmjs.com/package/systeminformation) to sample this
+  machine's **real network throughput** and emit observations into a live
+  `CausalRuntime`. `npm run host` shows your actual traffic driving the engine.
+
+Both are Node-only and never enter the browser bundle.
 
 ## M7 — persistence (Genome Vault) + replay defence
 
