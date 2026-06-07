@@ -3,66 +3,119 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Chimera — Causal Security Runtime</title>
+    <title>Chimera — does your defense actually matter?</title>
     <style>
       :root {
-        --bg: #0d1117; --panel: #161b22; --line: #30363d; --ink: #e6edf3; --dim: #8b949e;
+        --bg: #0d1117; --panel: #161b22; --panel2:#1c2330; --line: #30363d; --ink: #e6edf3; --dim: #8b949e;
         --healthy: #2ecc71; --alert: #f1c40f; --exposed: #e67e22; --isolated: #58a6ff;
-        --scarred: #a371f7; --dead: #f85149; --edge: #3d444d;
+        --scarred: #a371f7; --dead: #f85149; --edge: #3d444d; --accent:#a371f7;
       }
       * { box-sizing: border-box; }
-      body {
-        margin: 0; background: var(--bg); color: var(--ink);
-        font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-      }
-      header { padding: 18px 24px 6px; }
-      h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
-      .sub { color: var(--dim); margin: 4px 0 0; font-size: 13px; }
-      .controls { padding: 14px 24px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-      .controls .tick { color: var(--dim); }
-      input[type="range"] { width: min(560px, 60vw); accent-color: var(--scarred); }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 8px 24px 28px; }
-      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
-      .panel h2 { margin: 0 0 4px; font-size: 14px; }
-      .panel .tag { color: var(--dim); font-size: 12px; }
-      .verdict { float: right; font-weight: 700; padding: 2px 10px; border-radius: 999px; font-size: 12px; }
-      .v-survived { background: rgba(46,204,113,.15); color: var(--healthy); border: 1px solid var(--healthy); }
-      .v-collapsed { background: rgba(248,81,73,.15); color: var(--dead); border: 1px solid var(--dead); }
-      svg { width: 100%; height: 230px; display: block; }
-      .node-label { fill: var(--ink); font-size: 11px; }
-      .node-trust { fill: var(--dim); font-size: 10px; }
-      .log { margin-top: 8px; max-height: 180px; overflow: auto; font-size: 12px; }
-      .log div { padding: 1px 0; color: var(--dim); }
-      .log .obs { color: var(--ink); }
-      .log .dec { color: var(--scarred); }
-      .log .bad { color: var(--dead); }
-      .legend { padding: 0 24px 24px; color: var(--dim); font-size: 12px; display: flex; gap: 14px; flex-wrap: wrap; }
+      body { margin: 0; background: var(--bg); color: var(--ink);
+        font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      header { padding: 20px 24px 4px; }
+      h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
+      .sub { color: var(--dim); margin: 6px 0 0; font-size: 14px; max-width: 760px; }
+      .how { margin: 10px 0 0; font-size: 13px; color: var(--accent); }
+      .wrap { display: grid; grid-template-columns: 1.3fr .9fr; gap: 18px; padding: 14px 24px 28px; align-items: start; }
+      @media (max-width: 880px){ .wrap{ grid-template-columns: 1fr; } }
+
+      .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 24px 0; }
+      button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line);
+        background: var(--panel2); color: var(--ink); padding: 9px 14px; transition: .15s; }
+      button:hover { border-color: var(--accent); }
+      button.primary { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 700; }
+      .toggle { display:flex; align-items:center; gap:8px; margin-left:auto; user-select:none; }
+      .switch { width: 52px; height: 28px; border-radius: 999px; background: #30363d; position: relative; transition:.2s; border:1px solid var(--line); }
+      .switch.on { background: rgba(46,204,113,.35); border-color: var(--healthy); }
+      .knob { position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#e6edf3; transition:.2s; }
+      .switch.on .knob { left: 26px; background: var(--healthy); }
+
+      .banner { margin: 16px 24px 0; padding: 16px 18px; border-radius: 12px; font-size: 17px; font-weight: 700;
+        border: 1px solid var(--line); background: var(--panel); }
+      .banner small { display:block; font-weight:400; font-size:13px; color:var(--dim); margin-top:4px; }
+      .banner.survived { border-color: var(--healthy); background: rgba(46,204,113,.08); }
+      .banner.collapsed { border-color: var(--dead); background: rgba(248,81,73,.08); }
+      .banner.idle { border-color: var(--line); }
+
+      .punch { margin: 12px 24px 0; padding: 12px 16px; border-radius: 10px; font-size: 14px;
+        background: rgba(163,113,247,.08); border: 1px dashed var(--accent); display:none; }
+      .punch.show { display:block; }
+      .punch b.s { color: var(--healthy); } .punch b.c { color: var(--dead); }
+
+      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+      .panel h2 { margin: 0 0 6px; font-size: 13px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing:.5px; }
+      svg { width: 100%; height: 340px; display: block; }
+      .nodewrap { cursor: pointer; }
+      circle.node { transition: fill .35s, r .25s, stroke .2s; }
+      .nodewrap:hover circle.node { stroke: var(--ink); }
+      .node-label { fill: var(--ink); font-size: 12px; font-weight:600; pointer-events:none; }
+      .node-trust { fill: var(--dim); font-size: 10px; pointer-events:none; }
+      .node-state { font-size: 9px; pointer-events:none; }
+
+      .log { max-height: 300px; overflow:auto; font-size: 12.5px; }
+      .log .row { padding: 3px 6px; border-radius: 6px; cursor: pointer; color: var(--dim); }
+      .log .row:hover { background: var(--panel2); }
+      .log .row.sel { background: rgba(163,113,247,.15); }
+      .log .row.obs { color: var(--ink); }
+      .log .row.dec { color: var(--scarred); }
+      .log .row.bad { color: var(--dead); }
+      .why { margin-top:10px; padding:10px; border-radius:8px; background:var(--panel2); font-size:12.5px; min-height:20px; color:var(--dim); }
+      .why b { color: var(--ink); }
+
+      .legend { padding: 4px 24px 24px; color: var(--dim); font-size: 12px; display: flex; gap: 16px; flex-wrap: wrap; }
       .legend span::before { content: "●"; margin-right: 5px; }
-      .diverge { padding: 0 24px 8px; color: var(--alert); font-size: 13px; min-height: 20px; }
+      .tickbar { display:flex; align-items:center; gap:10px; margin-top:8px; font-size:12px; color:var(--dim); }
+      .tickbar input { flex:1; accent-color: var(--accent); }
     </style>
   </head>
   <body>
     <header>
-      <h1>Chimera — Causal Security Runtime</h1>
-      <p class="sub">Identical observations. One policy SURVIVES; do(Quarantine = false) COLLAPSES. Scrub time to watch them diverge.</p>
+      <h1>Chimera</h1>
+      <p class="sub">Watch a small network get attacked — and <b>prove</b> whether your automatic defense actually saved it,
+        by replaying the exact same attack with the defense switched off.</p>
+      <p class="how" id="how">👉 Click a node to attack it (hit the same one twice for a real hit), or press <b>⚡ Launch demo attack</b>.</p>
     </header>
+
     <div class="controls">
-      <label>tick <input id="scrub" type="range" min="0" value="0" /></label>
-      <span class="tick">t<span id="tickval">0</span> / <span id="tickmax">0</span></span>
+      <button class="primary" id="demo">⚡ Launch demo attack</button>
+      <button id="replay">▶ Replay</button>
+      <button id="reset">↺ Reset</button>
+      <label class="toggle">
+        <span id="defLabel">Auto-defense: ON</span>
+        <span class="switch on" id="defSwitch"><span class="knob"></span></span>
+      </label>
     </div>
-    <div class="diverge" id="diverge"></div>
-    <div class="grid">
-      <div class="panel" id="panel-actual"></div>
-      <div class="panel" id="panel-cf"></div>
+
+    <div class="banner idle" id="banner">Network healthy — no attack yet.</div>
+    <div class="punch" id="punch"></div>
+
+    <div class="wrap">
+      <div class="panel">
+        <h2 id="meshTitle">The network — click a node to attack it</h2>
+        <svg id="mesh" viewBox="0 0 420 340"></svg>
+        <div class="tickbar">
+          <span>replay</span>
+          <input type="range" id="scrub" min="0" max="0" value="0" />
+          <span>t<span id="tick">0</span>/<span id="tickmax">0</span></span>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>What happened (click an event to see why)</h2>
+        <div class="log" id="log"></div>
+        <div class="why" id="why">Click any event above to trace what caused it.</div>
+      </div>
     </div>
+
     <div class="legend">
       <span style="color:var(--healthy)">HEALTHY</span>
-      <span style="color:var(--alert)">ALERT</span>
-      <span style="color:var(--exposed)">EXPOSED</span>
-      <span style="color:var(--isolated)">ISOLATED</span>
-      <span style="color:var(--scarred)">SCARRED</span>
+      <span style="color:var(--alert)">ALERT (trust dented)</span>
+      <span style="color:var(--exposed)">EXPOSED (under attack)</span>
+      <span style="color:var(--isolated)">ISOLATED (quarantined)</span>
+      <span style="color:var(--scarred)">SCARRED (recovered)</span>
       <span style="color:var(--dead)">infected / collapsed</span>
     </div>
+
     <script type="module" src="app.js"></script>
   </body>
 </html>

@@ -15,7 +15,7 @@ npm run demo       # Phase 0 end-to-end story
 npm run multistage # M2: lifecycle + trust-heal + topology-agnostic divergence
 npm run live       # M3: live telemetry -> runtime, plus a branded SIMULATION
 npm run lan        # M4: two peers discover each other over real UDP multicast
-npm run viz        # M5: visualization at http://127.0.0.1:5173 (esbuild bundle + serve)
+npm run viz        # interactive sandbox at http://127.0.0.1:5173 (click to attack, toggle defense)
 npm run typecheck  # strict tsc, no emit
 ```
 
@@ -53,22 +53,26 @@ scripts/viz.mjs        esbuild bundle + dev server for the visualization (no fra
 - **M4 — real LAN transport** ✅ LanDiscovery over UDP multicast; discovery stays distinct from trust.
 - **M5 — visualization** ✅ see below.
 
-## M5 — visualization (the Memory River)
+## M5 — visualization (interactive sandbox)
 
 `npm run viz` → http://127.0.0.1:5173. A single self-contained page (vanilla TS +
-SVG, **no UI framework**) that reads **straight off the kernel**:
+SVG, **no UI framework**) that you actually operate:
 
-- `run()` and `counterfactual()` produce the two timelines; they render **side by
-  side** — ACTUAL vs `do(Quarantine:Bravo = false)`.
-- A **time-scrubber** drives `reconstruct(t)` (the "Memory River"): nodes recolour
-  by `nodeState()` and trust as you scrub, and each panel shows its verdict and the
-  events up to that tick.
-- It calls out the **divergence tick** — the same inputs, opposite fate.
+- **Click a node to attack it** — the network reacts live: trust drains, the node
+  changes colour, the auto-defense quarantines, infection spreads, the verdict updates.
+- **⚡ Launch demo attack** runs the canonical two-flood scenario for an instant payoff.
+- **Auto-defense ON/OFF toggle** — flip it and watch the verdict change.
+- **The punchline, always on screen:** Chimera replays the *same* attack with the
+  defense off, so you see in plain English — *"with defense → SURVIVED, without it →
+  COLLAPSED: that is the proof your intervention mattered."*
+- **Click any event** to trace what caused it (reads `explain()` off the causal DAG).
+- A **replay scrubber** drives `reconstruct(t)` — the Memory River.
 
-The browser bundle is produced by `scripts/viz.mjs` (esbuild, already present via
-tsx — pinned as a devDependency). It imports only browser-safe modules (the pure
-kernel); `lan.ts`/`node:dgram` are never pulled in. `web/app.js` is a build
-artifact and is gitignored.
+Everything is read straight off the pure kernel (`run` / `counterfactual` /
+`reconstruct` / `nodeState` / `explain`); no bespoke logic in the page. The browser
+bundle is produced by `scripts/viz.mjs` (esbuild, pinned devDependency) and imports
+only browser-safe modules — `node:dgram`/`lan.ts` are never pulled in. `web/app.js`
+is a build artifact and is gitignored.
 
 
 
