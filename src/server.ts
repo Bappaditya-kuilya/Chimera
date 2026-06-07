@@ -30,6 +30,7 @@ const TYPES: Record<string, string> = {
   ".map": "application/json; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
 };
 
 function stateView(rt: CausalRuntime) {
@@ -84,9 +85,9 @@ export function startServer(rt: CausalRuntime, opts: ServerOptions = {}): Promis
   const clients = new Set<WebSocket>();
 
   const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", `http://${host}`);
-    const path = url.pathname;
     try {
+      const url = new URL(req.url ?? "/", `http://${host}`);
+      const path = url.pathname;
       if (req.method === "GET" && path === "/api/state") return send(res, 200, stateView(rt));
       if (req.method === "GET" && path === "/api/timeline") return send(res, 200, rt.snapshot().timeline);
 

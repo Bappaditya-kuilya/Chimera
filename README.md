@@ -1,5 +1,7 @@
 # Chimera — Causal Security Runtime
 
+![ci](https://github.com/Bappaditya-kuilya/Chimera/actions/workflows/ci.yml/badge.svg)
+
 A deterministic causal engine for security decisions. From **identical observations**,
 it proves that the system's policy `SURVIVED` while a counterfactual
 `do(quarantine = false)` `COLLAPSED` — answering the question almost no security tool
@@ -43,7 +45,7 @@ IP is what prevented a COLLAPSE**. `npm run host` uses
 machine's actual network stats into the runtime.
 
 ```bash
-npm test           # full test suite (84 checks, incl. 400 fuzzed scenarios)
+npm test           # full test suite (107 checks, incl. 400 fuzzed scenarios)
 npm start          # the original kernel proof  (observations.ts)
 npm run demo       # Phase 0: identity, Sybil resistance, offline pairing
 npm run multistage # M2: lifecycle + trust-heal + topology-agnostic divergence
@@ -89,6 +91,7 @@ scripts/viz.mjs        esbuild bundle + dev server for the visualization (no fra
 - **M7 — persistence + replay defence** ✅ encrypted Genome Vault; captured-traffic replay rejected.
 - **M9 — real data integration** ✅ analyze real access logs; ingest real host metrics.
 - **M10 — live service + real QR** ✅ HTTP+WebSocket API serving the UI; scannable pairing QR.
+- **M11 — installable PWA** ✅ the UI installs and runs offline (manifest + service worker).
 
 ## M10 — run it as a real service (+ real QR)
 

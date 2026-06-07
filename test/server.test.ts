@@ -51,6 +51,11 @@ export const suite: Suite["suite"] = async (t) => {
     const bad = await fetch(`${base}/api/observe`, { method: "POST", body: "{not json" });
     t.eq("malformed body -> 400", bad.status, 400);
 
+    // a malformed URL ("//") must not crash the server (regression)
+    await fetch(`${base}//`).catch(() => {});
+    const stillUp = await fetch(`${base}/api/state`);
+    t.eq("server survives a malformed path", stillUp.status, 200);
+
     await wait(50);
     t.ok("WS streamed an initial state + decisions", messages.some((m) => m.type === "state") && messages.some((m) => m.type === "decisions"));
     ws.close();
