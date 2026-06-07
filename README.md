@@ -9,29 +9,27 @@ can: *"Can you prove that your intervention mattered?"*
 
 See `PROJECT_CHIMERA_HANDOFF.md` for the full thesis and design rationale.
 
-## Try it in 30 seconds (no security knowledge needed)
+## Use it now — no install
+
+**▶ Live app: https://chimera-opal.vercel.app/**
+
+Two things you can do, right in the browser (your logs never leave your device):
+
+1. **Analyze my data (flagship).** Drop a real server log — **nginx/Apache access
+   log, JSON, or CSV** — and Chimera shows, in plain English:
+   - **what happened**, **which defensive decision it made**, **why**, and
+   - **what would have happened without it** (it replays the same incident with that
+     block removed). On the sample log it proves *blocking the flooding IP is what
+     prevented a full collapse.* No log handy? Hit **"Try the sample log."**
+2. **Live sandbox.** Click a node to attack it, toggle the auto-defense on/off, and
+   watch **SURVIVED vs COLLAPSED** flip live.
+
+## Run / develop locally
 
 ```bash
 npm install
-npm run viz       # opens an interactive sandbox at http://127.0.0.1:5173
-```
-
-Then, in the browser:
-1. Press **⚡ Launch demo attack** (or click the center node twice). Watch the network get hit.
-2. See the verdict: **✅ SURVIVED** — the auto-defense quarantined the attacked node.
-3. Read the line that says *"with defense → SURVIVED, without it → COLLAPSED."*
-   **That is the whole point:** Chimera replays the identical attack with the defense
-   switched off and proves your defense is what saved the network.
-4. Flip **Auto-defense OFF** and re-launch to watch it collapse. Click any event to see *why* it happened.
-
-**Who is this for?** Anyone who needs to answer *"did our defensive action actually
-matter, or were we fine anyway?"* — a security/ops engineer reviewing an incident, or
-anyone trying to understand cause and effect in a system under attack.
-
-## Run it on REAL data
-
-```bash
-npm run analyze   # parse a real nginx/Apache access log -> causal verdict
+npm run viz       # interactive app at http://127.0.0.1:5173 (same as the live site)
+npm run analyze   # parse a real nginx/Apache access log -> causal verdict (CLI)
 npm run analyze /var/log/nginx/access.log    # ...or point it at your own
 npm run host      # read THIS machine's real network throughput into the engine
 npm run serve     # run Chimera as a live HTTP+WebSocket service (UI + API) on :8787
@@ -45,7 +43,7 @@ IP is what prevented a COLLAPSE**. `npm run host` uses
 machine's actual network stats into the runtime.
 
 ```bash
-npm test           # full test suite (107 checks, incl. 400 fuzzed scenarios)
+npm test           # full test suite (126 checks, incl. 400 fuzzed scenarios)
 npm start          # the original kernel proof  (observations.ts)
 npm run demo       # Phase 0: identity, Sybil resistance, offline pairing
 npm run multistage # M2: lifecycle + trust-heal + topology-agnostic divergence

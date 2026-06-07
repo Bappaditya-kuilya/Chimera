@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run viz:build",
+  "outputDirectory": "web",
+  "framework": null,
+  "cleanUrls": true
+}

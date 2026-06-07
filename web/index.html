@@ -3,120 +3,165 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Chimera — does your defense actually matter?</title>
+    <title>Chimera — did your security response actually matter?</title>
+    <meta name="description" content="Drop a server log. Chimera proves whether your defensive action prevented the incident from becoming a disaster — and what would have happened without it." />
     <link rel="manifest" href="manifest.webmanifest" />
     <meta name="theme-color" content="#0d1117" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <style>
       :root {
-        --bg: #0d1117; --panel: #161b22; --panel2:#1c2330; --line: #30363d; --ink: #e6edf3; --dim: #8b949e;
-        --healthy: #2ecc71; --alert: #f1c40f; --exposed: #e67e22; --isolated: #58a6ff;
-        --scarred: #a371f7; --dead: #f85149; --edge: #3d444d; --accent:#a371f7;
+        --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#30363d; --ink:#e6edf3; --dim:#8b949e;
+        --healthy:#2ecc71; --alert:#f1c40f; --exposed:#e67e22; --isolated:#58a6ff; --scarred:#a371f7;
+        --dead:#f85149; --edge:#3d444d; --accent:#a371f7;
       }
-      * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--ink);
-        font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
-      header { padding: 20px 24px 4px; }
-      h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
-      .sub { color: var(--dim); margin: 6px 0 0; font-size: 14px; max-width: 760px; }
-      .how { margin: 10px 0 0; font-size: 13px; color: var(--accent); }
-      .wrap { display: grid; grid-template-columns: 1.3fr .9fr; gap: 18px; padding: 14px 24px 28px; align-items: start; }
-      @media (max-width: 880px){ .wrap{ grid-template-columns: 1fr; } }
+      * { box-sizing:border-box; }
+      html,body { margin:0; }
+      body { background:var(--bg); color:var(--ink); font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
+      a { color:var(--accent); }
+      .wrap { max-width:1080px; margin:0 auto; padding:0 18px 48px; }
 
-      .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 24px 0; }
-      button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line);
-        background: var(--panel2); color: var(--ink); padding: 9px 14px; transition: .15s; }
-      button:hover { border-color: var(--accent); }
-      button.primary { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: 700; }
-      .toggle { display:flex; align-items:center; gap:8px; margin-left:auto; user-select:none; }
-      .switch { width: 52px; height: 28px; border-radius: 999px; background: #30363d; position: relative; transition:.2s; border:1px solid var(--line); }
-      .switch.on { background: rgba(46,204,113,.35); border-color: var(--healthy); }
-      .knob { position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#e6edf3; transition:.2s; }
-      .switch.on .knob { left: 26px; background: var(--healthy); }
+      header { padding:30px 0 10px; text-align:center; }
+      h1 { margin:0; font-size:30px; letter-spacing:.5px; }
+      .tag { color:var(--dim); margin:8px auto 0; font-size:15px; max-width:680px; }
+      .tag b { color:var(--ink); }
 
-      .banner { margin: 16px 24px 0; padding: 16px 18px; border-radius: 12px; font-size: 17px; font-weight: 700;
-        border: 1px solid var(--line); background: var(--panel); }
-      .banner small { display:block; font-weight:400; font-size:13px; color:var(--dim); margin-top:4px; }
-      .banner.survived { border-color: var(--healthy); background: rgba(46,204,113,.08); }
-      .banner.collapsed { border-color: var(--dead); background: rgba(248,81,73,.08); }
-      .banner.idle { border-color: var(--line); }
+      .tabs { display:flex; gap:8px; justify-content:center; margin:22px 0 18px; flex-wrap:wrap; }
+      .tab { padding:10px 18px; border:1px solid var(--line); background:var(--panel); color:var(--dim);
+        border-radius:999px; cursor:pointer; font:inherit; transition:.15s; }
+      .tab.active { color:#0d1117; background:var(--accent); border-color:var(--accent); font-weight:700; }
+      .tab:not(.active):hover { color:var(--ink); border-color:var(--accent); }
 
-      .punch { margin: 12px 24px 0; padding: 12px 16px; border-radius: 10px; font-size: 14px;
-        background: rgba(163,113,247,.08); border: 1px dashed var(--accent); display:none; }
-      .punch.show { display:block; }
-      .punch b.s { color: var(--healthy); } .punch b.c { color: var(--dead); }
+      .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:16px; }
+      .muted { color:var(--dim); } .small { font-size:12.5px; }
 
-      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-      .panel h2 { margin: 0 0 6px; font-size: 13px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing:.5px; }
-      svg { width: 100%; height: 340px; display: block; }
-      .nodewrap { cursor: pointer; }
-      circle.node { transition: fill .35s, r .25s, stroke .2s; }
-      .nodewrap:hover circle.node { stroke: var(--ink); }
-      .node-label { fill: var(--ink); font-size: 12px; font-weight:600; pointer-events:none; }
-      .node-trust { fill: var(--dim); font-size: 10px; pointer-events:none; }
-      .node-state { font-size: 9px; pointer-events:none; }
+      /* dropzone */
+      .drop { border:2px dashed var(--line); border-radius:14px; padding:34px 18px; text-align:center; transition:.15s; cursor:pointer; }
+      .drop.hover { border-color:var(--accent); background:rgba(163,113,247,.06); }
+      .drop h3 { margin:0 0 6px; font-size:17px; }
+      .row { display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; margin-top:14px; }
+      button { font:inherit; cursor:pointer; border-radius:9px; border:1px solid var(--line); background:var(--panel2); color:var(--ink); padding:10px 16px; transition:.15s; }
+      button:hover { border-color:var(--accent); }
+      button.primary { background:var(--accent); color:#0d1117; border-color:var(--accent); font-weight:700; }
+      textarea { width:100%; min-height:120px; background:#0b0f14; color:var(--ink); border:1px solid var(--line);
+        border-radius:10px; padding:10px; font:12px/1.5 ui-monospace,Menlo,monospace; resize:vertical; margin-top:12px; }
+      .formats { margin-top:10px; font-size:12px; color:var(--dim); }
 
-      .log { max-height: 300px; overflow:auto; font-size: 12.5px; }
-      .log .row { padding: 3px 6px; border-radius: 6px; cursor: pointer; color: var(--dim); }
-      .log .row:hover { background: var(--panel2); }
-      .log .row.sel { background: rgba(163,113,247,.15); }
-      .log .row.obs { color: var(--ink); }
-      .log .row.dec { color: var(--scarred); }
-      .log .row.bad { color: var(--dead); }
-      .why { margin-top:10px; padding:10px; border-radius:8px; background:var(--panel2); font-size:12.5px; min-height:20px; color:var(--dim); }
-      .why b { color: var(--ink); }
+      /* verdict banner */
+      .verdict { padding:20px; border-radius:14px; border:1px solid var(--line); margin-bottom:16px; }
+      .verdict .big { font-size:22px; font-weight:800; }
+      .verdict .sub { color:var(--dim); margin-top:6px; font-size:14px; }
+      .verdict.survived { border-color:var(--healthy); background:rgba(46,204,113,.08); }
+      .verdict.collapsed { border-color:var(--dead); background:rgba(248,81,73,.08); }
+      .verdict.neutral { border-color:var(--line); }
+      .proof { margin-top:12px; padding:12px 14px; border-radius:10px; background:rgba(163,113,247,.08); border:1px dashed var(--accent); font-size:14px; }
+      .proof b.s { color:var(--healthy); } .proof b.c { color:var(--dead); }
 
-      .legend { padding: 4px 24px 24px; color: var(--dim); font-size: 12px; display: flex; gap: 16px; flex-wrap: wrap; }
-      .legend span::before { content: "●"; margin-right: 5px; }
+      .grid2 { display:grid; grid-template-columns:1.15fr .85fr; gap:16px; }
+      @media (max-width:820px){ .grid2 { grid-template-columns:1fr; } }
+
+      .steps h4 { margin:0 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); }
+      .steps .step { margin-bottom:14px; }
+      .steps .step p { margin:0; }
+      .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; border:1px solid var(--line); margin:2px 4px 2px 0; }
+      .pill.q { color:var(--isolated); border-color:var(--isolated); }
+      .pill.bad { color:var(--dead); border-color:var(--dead); }
+
+      svg { width:100%; height:300px; display:block; }
+      circle.node { transition:fill .35s,r .25s; }
+      .nodewrap { cursor:default; }
+      .nodewrap.click { cursor:pointer; }
+      .nodewrap.click:hover circle.node { stroke:var(--ink); }
+      .nlabel { fill:var(--ink); font-size:10px; font-weight:600; pointer-events:none; }
+      .nsub { fill:var(--dim); font-size:9px; pointer-events:none; }
+
+      .log { max-height:240px; overflow:auto; font-size:12px; }
+      .log .e { padding:2px 6px; border-radius:6px; color:var(--dim); cursor:pointer; }
+      .log .e:hover { background:var(--panel2); }
+      .log .e.obs { color:var(--ink); } .log .e.dec { color:var(--scarred); } .log .e.bad { color:var(--dead); }
+      .why { margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--panel2); min-height:18px; color:var(--dim); font-size:12px; }
+      .why b { color:var(--ink); }
+
       .tickbar { display:flex; align-items:center; gap:10px; margin-top:8px; font-size:12px; color:var(--dim); }
-      .tickbar input { flex:1; accent-color: var(--accent); }
+      .tickbar input { flex:1; accent-color:var(--accent); }
+      .legend { color:var(--dim); font-size:12px; display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+      .legend span::before { content:"●"; margin-right:5px; }
+
+      .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+      .toggle { display:flex; align-items:center; gap:8px; margin-left:auto; user-select:none; cursor:pointer; }
+      .switch { width:50px; height:27px; border-radius:999px; background:#30363d; position:relative; transition:.2s; border:1px solid var(--line); }
+      .switch.on { background:rgba(46,204,113,.35); border-color:var(--healthy); }
+      .knob { position:absolute; top:2px; left:2px; width:21px; height:21px; border-radius:50%; background:#e6edf3; transition:.2s; }
+      .switch.on .knob { left:25px; background:var(--healthy); }
+      .hidden { display:none; }
+      footer { text-align:center; color:var(--dim); font-size:12px; margin-top:24px; }
     </style>
   </head>
   <body>
-    <header>
-      <h1>Chimera</h1>
-      <p class="sub">Watch a small network get attacked — and <b>prove</b> whether your automatic defense actually saved it,
-        by replaying the exact same attack with the defense switched off.</p>
-      <p class="how" id="how">👉 Click a node to attack it (hit the same one twice for a real hit), or press <b>⚡ Launch demo attack</b>.</p>
-    </header>
-
-    <div class="controls">
-      <button class="primary" id="demo">⚡ Launch demo attack</button>
-      <button id="replay">▶ Replay</button>
-      <button id="reset">↺ Reset</button>
-      <label class="toggle">
-        <span id="defLabel">Auto-defense: ON</span>
-        <span class="switch on" id="defSwitch"><span class="knob"></span></span>
-      </label>
-    </div>
-
-    <div class="banner idle" id="banner">Network healthy — no attack yet.</div>
-    <div class="punch" id="punch"></div>
-
     <div class="wrap">
-      <div class="panel">
-        <h2 id="meshTitle">The network — click a node to attack it</h2>
-        <svg id="mesh" viewBox="0 0 420 340"></svg>
-        <div class="tickbar">
-          <span>replay</span>
-          <input type="range" id="scrub" min="0" max="0" value="0" />
-          <span>t<span id="tick">0</span>/<span id="tickmax">0</span></span>
-        </div>
-      </div>
-      <div class="panel">
-        <h2>What happened (click an event to see why)</h2>
-        <div class="log" id="log"></div>
-        <div class="why" id="why">Click any event above to trace what caused it.</div>
-      </div>
-    </div>
+      <header>
+        <h1>Chimera</h1>
+        <p class="tag">Drop a server log and Chimera proves whether your defensive action
+          <b>prevented a disaster</b> — by replaying the exact same incident with that action removed.</p>
+      </header>
 
-    <div class="legend">
-      <span style="color:var(--healthy)">HEALTHY</span>
-      <span style="color:var(--alert)">ALERT (trust dented)</span>
-      <span style="color:var(--exposed)">EXPOSED (under attack)</span>
-      <span style="color:var(--isolated)">ISOLATED (quarantined)</span>
-      <span style="color:var(--scarred)">SCARRED (recovered)</span>
-      <span style="color:var(--dead)">infected / collapsed</span>
+      <div class="tabs">
+        <button class="tab active" id="tab-analyze">📂 Analyze my data</button>
+        <button class="tab" id="tab-sandbox">🎮 Live sandbox</button>
+      </div>
+
+      <!-- ANALYZE MODE -->
+      <section id="mode-analyze">
+        <div class="card" id="intake">
+          <div class="drop" id="drop">
+            <h3>Drop a log file here</h3>
+            <p class="muted small">…or click to choose a file, paste below, or try the sample.</p>
+            <div class="row">
+              <button class="primary" id="pick">Choose file</button>
+              <button id="sample">Try the sample log</button>
+            </div>
+            <div class="formats">supports: nginx / Apache access logs · JSON · CSV</div>
+            <input id="file" type="file" accept=".log,.txt,.json,.csv" class="hidden" />
+          </div>
+          <textarea id="paste" placeholder="…or paste log lines here, then press Analyze"></textarea>
+          <div class="row"><button class="primary" id="analyze">Analyze</button></div>
+        </div>
+        <div id="report"></div>
+      </section>
+
+      <!-- SANDBOX MODE -->
+      <section id="mode-sandbox" class="hidden">
+        <div class="controls">
+          <button class="primary" id="sb-demo">⚡ Launch demo attack</button>
+          <button id="sb-replay">▶ Replay</button>
+          <button id="sb-reset">↺ Reset</button>
+          <span class="toggle" id="sb-toggle"><span id="sb-deflabel">Auto-defense: ON</span>
+            <span class="switch on" id="sb-switch"><span class="knob"></span></span></span>
+        </div>
+        <div class="verdict neutral" id="sb-banner"><span class="big">Click a node to attack it</span>
+          <div class="sub">Hit the center node twice for a real hit — or press “Launch demo attack”.</div></div>
+        <div class="grid2">
+          <div class="card">
+            <svg id="sb-mesh" viewBox="0 0 440 300"></svg>
+            <div class="tickbar"><span>replay</span><input type="range" id="sb-scrub" min="0" max="0" value="0" />
+              <span>t<span id="sb-tick">0</span>/<span id="sb-tmax">0</span></span></div>
+            <div class="legend">
+              <span style="color:var(--healthy)">healthy</span><span style="color:var(--alert)">alert</span>
+              <span style="color:var(--exposed)">exposed</span><span style="color:var(--isolated)">isolated</span>
+              <span style="color:var(--scarred)">scarred</span><span style="color:var(--dead)">infected</span>
+            </div>
+          </div>
+          <div class="card">
+            <h4 class="muted small" style="margin:0 0 6px">WHAT HAPPENED (click an event)</h4>
+            <div class="log" id="sb-log"></div>
+            <div class="why" id="sb-why">Click any event to trace what caused it.</div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        Open source · <a href="https://github.com/Bappaditya-kuilya/Chimera">github.com/Bappaditya-kuilya/Chimera</a>
+        · runs entirely in your browser — your logs never leave your device.
+      </footer>
     </div>
 
     <script type="module" src="app.js"></script>

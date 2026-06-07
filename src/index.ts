@@ -20,6 +20,7 @@ export * from "./source.js";
 export * from "./runtime.js";
 export * from "./vault.js";
 export * from "./sources/access-log.js";
+export * from "./sources/log-formats.js";
 export * from "./sources/host-metrics.js";
 export * from "./qr.js";
 export * from "./server.js";

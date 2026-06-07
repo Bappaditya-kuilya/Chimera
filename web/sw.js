@@ -1,5 +1,6 @@
-/* Chimera PWA service worker — cache-first so the sandbox works fully offline. */
-const CACHE = "chimera-v1";
+/* Chimera PWA service worker — network-first for the app shell so redeploys are
+   never stale, with a cache fallback so it still works fully offline. */
+const CACHE = "chimera-v2";
 const ASSETS = ["./", "./index.html", "./app.js", "./icon.svg", "./manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -13,13 +14,17 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-  // Don't intercept the live API — only the static app shell.
-  if (new URL(e.request.url).pathname.startsWith("/api/")) return;
+  const req = e.request;
+  if (req.method !== "GET") return;
+  if (new URL(req.url).pathname.startsWith("/api/")) return; // never cache the live API
+  // network-first: fresh when online, cached when offline.
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
-      return res;
-    }).catch(() => caches.match("./index.html"))),
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(req).then((hit) => hit || caches.match("./index.html"))),
   );
 });

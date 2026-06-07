@@ -37,7 +37,7 @@ const MONTHS: Record<string, number> = {
   Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
 };
 
-type Entry = { ip: string; epoch: number; status: number };
+export type Entry = { ip: string; epoch: number; status: number };
 
 function parseTime(s: string): number | null {
   const m = TIME.exec(s.trim());
@@ -62,22 +62,13 @@ export type AccessLogResult = {
   };
 };
 
-/** Parse a real access log into observations + a derived topology. */
-export function parseAccessLog(text: string, opts: AccessLogOptions = {}): AccessLogResult {
+/**
+ * Shared mapping: turn parsed {ip, epoch, status} entries into observations + a
+ * derived Server-hub topology. Used by ALL log formats (combined/JSON/CSV) so the
+ * "is this an attack?" rule lives in exactly one place.
+ */
+export function buildFromEntries(entries: Entry[], opts: AccessLogOptions = {}): AccessLogResult {
   const o = { ...DEFAULTS, ...opts };
-  const entries: Entry[] = [];
-  let lines = 0;
-
-  for (const raw of text.split("\n")) {
-    if (!raw.trim()) continue;
-    const m = LINE.exec(raw);
-    if (!m) continue;
-    const epoch = parseTime(m[2]!);
-    if (epoch === null) continue;
-    lines++;
-    entries.push({ ip: m[1]!, epoch, status: Number(m[5]) });
-  }
-
   if (!entries.length) {
     return {
       observations: [],
@@ -91,7 +82,7 @@ export function parseAccessLog(text: string, opts: AccessLogOptions = {}): Acces
   const counts = new Map<string, Map<number, { reqs: number; authFails: number }>>();
   const perClient = new Map<string, number>();
   for (const e of entries) {
-    const bucket = e.epoch - minEpoch;
+    const bucket = Math.max(0, Math.floor(e.epoch - minEpoch));
     const byBucket = counts.get(e.ip) ?? new Map();
     const cell = byBucket.get(bucket) ?? { reqs: 0, authFails: 0 };
     cell.reqs++;
@@ -124,14 +115,25 @@ export function parseAccessLog(text: string, opts: AccessLogOptions = {}): Acces
   const edges: Record<string, string[]> = { [o.server]: [...clients] };
   for (const ip of clients) edges[ip] = [o.server];
 
-  const busiestClient =
-    clients.length === 0
-      ? null
-      : [...perClient.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]![0];
+  const busiestClient = [...perClient.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]![0];
 
   return {
     observations: observations.sort((a, b) => a.t - b.t || a.id.localeCompare(b.id)),
     topology: { nodes, edges },
-    summary: { lines, clients, floods, badSigs, busiestClient },
+    summary: { lines: entries.length, clients, floods, badSigs, busiestClient },
   };
+}
+
+/** Parse a real access log (combined/common format) into observations + topology. */
+export function parseAccessLog(text: string, opts: AccessLogOptions = {}): AccessLogResult {
+  const entries: Entry[] = [];
+  for (const raw of text.split("\n")) {
+    if (!raw.trim()) continue;
+    const m = LINE.exec(raw);
+    if (!m) continue;
+    const epoch = parseTime(m[2]!);
+    if (epoch === null) continue;
+    entries.push({ ip: m[1]!, epoch, status: Number(m[5]) });
+  }
+  return buildFromEntries(entries, opts);
 }
